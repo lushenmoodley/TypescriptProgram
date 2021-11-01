@@ -1,3 +1,45 @@
+// Project Type
+var ProjectStatus;
+(function (ProjectStatus) {
+    ProjectStatus[ProjectStatus["Active"] = 0] = "Active";
+    ProjectStatus[ProjectStatus["Finished"] = 1] = "Finished";
+})(ProjectStatus || (ProjectStatus = {}));
+var Project = /** @class */ (function () {
+    function Project(id, title, description, people, status) {
+        this.id = id;
+        this.title = title;
+        this.description = description;
+        this.people = people;
+        this.status = status;
+    }
+    return Project;
+}());
+var ProjectState = /** @class */ (function () {
+    function ProjectState() {
+        this.listeners = [];
+        this.projects = [];
+    }
+    ProjectState.getInstance = function () {
+        if (this.instance) {
+            return this.instance;
+        }
+        this.instance = new ProjectState();
+        return this.instance;
+    };
+    ProjectState.prototype.addListener = function (listenerFn) {
+        this.listeners.push(listenerFn);
+    };
+    ProjectState.prototype.addProject = function (title, description, numOfPeople) {
+        var newProject = new Project(Math.random().toString(), title, description, numOfPeople, ProjectStatus.Active);
+        this.projects.push(newProject);
+        for (var _i = 0, _a = this.listeners; _i < _a.length; _i++) {
+            var listenerFn = _a[_i];
+            listenerFn(this.projects.slice());
+        }
+    };
+    return ProjectState;
+}());
+var projectState = ProjectState.getInstance();
 function validate(ValidatableInput) {
     var isValid = true;
     if (ValidatableInput.required) {
@@ -22,20 +64,42 @@ function validate(ValidatableInput) {
 //rendering projectlist class
 var ProjectList = /** @class */ (function () {
     function ProjectList(type) {
+        var _this = this;
         this.type = type;
         this.templateElement = document.getElementById('project-list');
         this.hostElement = document.getElementById('app');
-        //we import our content
+        this.assignedProjects = [];
         var importedNode = document.importNode(this.templateElement.content, true);
-        this.element = importedNode.firstElementChild; //store the first element of the imported template,we store in the property element
+        this.element = importedNode.firstElementChild;
         this.element.id = this.type + "-projects";
-        this.attach(); //attaching our created element to the dom
+        projectState.addListener(function (projects) {
+            var relevantProjects = projects.filter(function (prj) {
+                if (_this.type === 'active') {
+                    return prj.status === ProjectStatus.Active;
+                }
+                return prj.status === ProjectStatus.Finished;
+            });
+            _this.assignedProjects = relevantProjects;
+            _this.renderProjects();
+        });
+        this.attach();
         this.renderContent();
     }
+    ProjectList.prototype.renderProjects = function () {
+        var listEl = document.getElementById(this.type + "-projects-list");
+        listEl.innerHTML = '';
+        for (var _i = 0, _a = this.assignedProjects; _i < _a.length; _i++) {
+            var prjItem = _a[_i];
+            var listItem = document.createElement('li');
+            listItem.textContent = prjItem.title;
+            listEl.appendChild(listItem);
+        }
+    };
     ProjectList.prototype.renderContent = function () {
         var listId = this.type + "-projects-list";
         this.element.querySelector('ul').id = listId;
-        this.element.querySelector('h2').textContent = this.type.toUpperCase() + 'Projects';
+        this.element.querySelector('h2').textContent =
+            this.type.toUpperCase() + ' PROJECTS';
     };
     ProjectList.prototype.attach = function () {
         this.hostElement.insertAdjacentElement('beforeend', this.element);
@@ -92,6 +156,7 @@ var ProjectInput = /** @class */ (function () {
         if (Array.isArray(userInput)) {
             var title = userInput[0], desc = userInput[1], people = userInput[2];
             console.log(title + desc + people);
+            projectState.addProject(title, desc, people);
             this.clearInputs();
         }
     };
@@ -110,4 +175,3 @@ var ProjectInput = /** @class */ (function () {
 }());
 var prjInput = new ProjectInput();
 var activePrjList = new ProjectList('active');
-var finishPrjList = new ProjectList('finished');
